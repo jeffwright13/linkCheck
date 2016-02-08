@@ -14,35 +14,38 @@ Usage:
 
 Options:
     -h --help       Show this screen
-    --version       Show version
+    -v --version    Show version
     -i --server_ip  IP address of FTP server
     -u --user       Username for FTP server
     -p --password   Password for FTP user
 
 Author:
     Jeff Wright <jeff.wright@hughes.com>
-
-To Do:
-    - Add transport device support for 350LPE, 750B, Zyxel
 """
 
-import sys, os, traceback, time, re
+VERSION = "0.1"
+
+import sys, os, platform, traceback, time, re
 from ftplib import FTP
 from docopt import docopt
 
-def main ():
-    global options, args
-    pingFTP()
-    uploadFTP()
-    downloadFTP()
+def main (arguments):
+    #print(arguments)
+    print "IP: " + arguments['<ftp_server_ip>']
 
-def pingFTP():
+    pingFTP(arguments)
+    uploadFTP(arguments)
+    downloadFTP(arguments)
+
+def pingFTP(arguments):
     print "In function 'pingFTP'"
+    num_iterations = '20'
+    response = os.system("ping -c " + num_iterations + ' ' + arguments['<ftp_server_ip>'])
 
-def uploadFTP():
+def uploadFTP(arguments):
     print "In function 'uploadFTP'"
 
-def downloadFTP():
+def downloadFTP(arguments):
     print "In function 'downloadFTP'"
 
 def logIt():
@@ -53,9 +56,8 @@ def getStats():
 
 if __name__ == '__main__':
     try:
-        arguments = docopt(__doc__, version='linkCheck.py 0.1')
-        print(arguments)
-        main()
+        arguments = docopt(__doc__, version=VERSION)
+        main(arguments)
         sys.exit(0)
     except KeyboardInterrupt, e: # Ctrl-C
         raise e
