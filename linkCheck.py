@@ -1,36 +1,34 @@
 #!/usr/bin/env python
 """
-SYNOPSIS
-
-    TODO linkCheck [-h,--help] [-v,--verbose] [--version]
-
-DESCRIPTION
-
-    Script to automate speedtests using FTP:
+Description:
+    Automate speedtests using FTP:
         - ping
         - upload speed
         - download speed
         - transport device stats
 
-AUTHOR
+Usage:
+    linkCheck.py <ftp_server_ip>
+    linkCheck.py (-h | --help)
+    linkCheck.py --version
 
+Options:
+    -h --help       Show this screen
+    --version       Show version
+    -i --server_ip  IP address of FTP server
+    -u --user       Username for FTP server
+    -p --password   Password for FTP user
+
+Author:
     Jeff Wright <jeff.wright@hughes.com>
 
-LICENSE
-
-    This script is in the public domain, free from copyrights or restrictions.
-
-VERSION
-
-    $Id$
-
-TO DO
-    Add in transport device support for CP 350LPE, 750B, Zyxel
-
+To Do:
+    - Add transport device support for 350LPE, 750B, Zyxel
 """
 
-import sys, os, traceback, docopt, time, re
+import sys, os, traceback, time, re
 from ftplib import FTP
+from docopt import docopt
 
 def main ():
     global options, args
@@ -39,17 +37,24 @@ def main ():
     downloadFTP()
 
 def pingFTP():
-    pass
+    print "In function 'pingFTP'"
 
 def uploadFTP():
-    pass
+    print "In function 'uploadFTP'"
 
 def downloadFTP():
-    pass
+    print "In function 'downloadFTP'"
+
+def logIt():
+    print "In function 'logIt'"
+
+def getStats():
+    print "In function 'getStats'"
 
 if __name__ == '__main__':
     try:
-        start_time = time.time()
+        arguments = docopt(__doc__, version='linkCheck.py 0.1')
+        print(arguments)
         main()
         sys.exit(0)
     except KeyboardInterrupt, e: # Ctrl-C
