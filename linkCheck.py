@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 """
 Description:
     Automate speedtests using FTP:
@@ -25,31 +26,43 @@ Author:
 # VERSION
 __version__ = "0.5"
 
+
 # GLOBAL EXCUTION VARS
 num_pings = '2'
+testfile = "1mb.test"
 logfilename = 'modemtestreport.csv'
 csv_header = "Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(KBps),Download Speed(KBps),Modem ID,Group,MDN,Carrier,IMEI,RSSI,RSRP,RSRQ,SINR,Firmware"
 
-import sys, os, socket, traceback, re, subprocess, datetime
+
+# IMPORTS
+import sys, os, socket, re, subprocess, datetime
 from ftplib import FTP
 from docopt import docopt
 
 
+# MAIN DRIVER SECTION
 def main (arguments):
-    result = runIt(arguments)
-    logIt (result)
 
+    # Ping test
+    result = runPing(arguments)
+    logPing(result)
 
-def runIt(arguments):
-    """
-    Run following in order:
-      - ping FTP server <num_pings> times, & write results to file
-      - push upload to ftp server & write speed to file
-      - fetch download from ftp server & write speed to file
-      - get modem stats and write to file
-    """
+    # FTP Upload
+    result = runFtpUpload(arguments)
+    logFtpUpload(result)
 
-    # Ping FTP server
+    # FTP Download
+    result = runFtpDownload(arguments)
+    logFtpDownload(result)
+
+    # Modem stats
+    result = getModemStats(arguments)
+    logModemStats(result)
+
+# PING FTP SERVER
+def runPing(arguments):
+
+    print "Pinging FTP server..."
     try:
         ping = subprocess.Popen(["ping", "-c", num_pings,
                                  arguments['<ftp_server_ip>']],
@@ -57,17 +70,14 @@ def runIt(arguments):
                                  stderr = subprocess.PIPE)
         out, error = ping.communicate()
         matcher = re.compile("rtt min/avg/max/mdev = (\d+.\d+)/(\d+.\d+)/(\d+.\d+)/(\d+.\d+)")
-
     except socket.error, e:
         print "Ping Error:", e
         raise e
-
     return matcher.search(out).groups()
 
 
-def logIt(data):
-    
-    print "  data: ", data, type(data)
+# WRITE PING RESULTS TO FILE
+def logPing(data):
 
     try:
         with open('modemtestreport.csv', 'a') as file:
@@ -94,6 +104,30 @@ def logIt(data):
     except IOError as e:
         print "Unable to open file."
         raise e
+
+# 
+def runFtpUpload(data):
+    pass
+
+# 
+def logFtpUpload(data):
+    pass
+
+# 
+def runFtpDownload(data):
+    pass
+
+# 
+def logFtpDownload(data):
+    pass
+
+# 
+def getModemStats(data):
+    pass
+
+# 
+def logModemStats(data):
+    pass
 
 
 if __name__ == '__main__':

@@ -63,3 +63,4 @@ target/
 
 # Custom stuff for this project
 *.csv
+*.test
