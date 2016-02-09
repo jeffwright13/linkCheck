@@ -23,15 +23,16 @@ Author:
     Jeff Wright <jeff.wright@hughes.com>
 """
 
-__version__ = "0.2"
+__version__ = "0.3"
 
 import sys, os, platform, socket, traceback, time, re, subprocess
 from ftplib import FTP
 from docopt import docopt
 
 def main (arguments):
-    out = pingFTP(arguments)
-    print "out: " + str(out)
+    result = pingFTP(arguments)
+    print "Result: "
+    print result
 
     uploadFTP(arguments)
 
@@ -39,18 +40,21 @@ def main (arguments):
 
 def pingFTP(arguments):
     print "In function 'pingFTP'"
-    num_iterations = '1'
+    num_iterations = '2'
     try:
         ping = subprocess.Popen(["ping", "-c", num_iterations,
-                                 arguments['<ftp_server_ip>']])
+                                 arguments['<ftp_server_ip>']],
+                                 stdout = subprocess.PIPE,
+                                 stderr = subprocess.PIPE)
         out, error = ping.communicate()
-        print out
+
         matcher = re.compile("rtt min/avg/max/mdev = (\d+.\d+)/(\d+.\d+)/(\d+.\d+)/(\d+.\d+)")
-        #print matcher -- <_sre.SRE_Pattern object at 0xd179d0>
-        #print matcher.search(out).groups()
+        return matcher.search(out).groups()
 
     except socket.error, e:
         print "Ping Error:", e
+        
+    return (out)
 
 def uploadFTP(arguments):
     print "In function 'uploadFTP'"
