@@ -2,9 +2,8 @@
 """
 Description:
     Automate speedtests using FTP:
-        - ping
-        - upload speed
-        - download speed
+        - ping FTP server (latency)
+        - upload & download speed
         - transport device stats
 
 Usage:
@@ -23,62 +22,66 @@ Author:
     Jeff Wright <jeff.wright@hughes.com>
 """
 
-__version__ = "0.3"
+# VERSION
+__version__ = "0.5"
 
-import sys, os, platform, socket, traceback, time, re, subprocess
+# GLOBAL EXCUTION VARS
+num_pings = '2'
+logfilename = 'modemtestreport.csv'
+csv_header = "Time,Ping Min,Ping Max,Ping Average,Upload Speed(KBps),Download Speed(KBps),Modem ID,Group,MDN,Carrier,IMEI,RSSI,RSRP,RSRQ,SINR,Firmware"
+
+import sys, os, socket, traceback, re, subprocess, datetime
 from ftplib import FTP
 from docopt import docopt
 
+
 def main (arguments):
-    result = pingFTP(arguments)
-    print "Result: "
-    print result
+    result = runIt(arguments)
+    logIt (result)
 
-    uploadFTP(arguments)
 
-    downloadFTP(arguments)
+def runIt(arguments):
+    print "Entering function 'pingFTP'"
 
-def pingFTP(arguments):
-    print "In function 'pingFTP'"
-    num_iterations = '2'
     try:
-        ping = subprocess.Popen(["ping", "-c", num_iterations,
+        ping = subprocess.Popen(["ping", "-c", num_pings,
                                  arguments['<ftp_server_ip>']],
                                  stdout = subprocess.PIPE,
                                  stderr = subprocess.PIPE)
         out, error = ping.communicate()
-
         matcher = re.compile("rtt min/avg/max/mdev = (\d+.\d+)/(\d+.\d+)/(\d+.\d+)/(\d+.\d+)")
-        return matcher.search(out).groups()
-
     except socket.error, e:
         print "Ping Error:", e
-        
-    return (out)
+        raise e
 
-def uploadFTP(arguments):
-    print "In function 'uploadFTP'"
+    print "Exiting function 'pingFTP'"
+    return matcher.search(out).groups()
 
-def downloadFTP(arguments):
-    print "In function 'downloadFTP'"
 
-def logIt():
-    print "In function 'logIt'"
+def logIt(data):
+    print "Entering function 'logIt'"
+    
+    print "  data: ", data
 
-def getStats():
-    print "In function 'getStats'"
+    try:
+        with open('modemtestreport.csv', 'a') as file:
+            # If file is size zero, write header into it
+            info = os.stat(logfilename)
+            print "  info: ", info
+            print "  size: ", info.st_size
+            
+            if info.st_size == 0:
+                file.write(csv_header)
+            now = datetime.datetime.now()
+            print "  now: ", now
+    except IOError as e:
+        print "Unable to open file"
+        raise e
+
+    print "Exiting function 'logIt'"
+
 
 if __name__ == '__main__':
-    try:
-        arguments = docopt(__doc__, version=__version__)
-        main(arguments)
-        sys.exit(0)
-    except KeyboardInterrupt, e: # Ctrl-C
-        raise e
-    except SystemExit, e: # sys.exit()
-        raise e
-    except Exception, e:
-        print 'ERROR, UNEXPECTED EXCEPTION'
-        print str(e)
-        traceback.print_exc()
-        os._exit(1)
+    arguments = docopt(__doc__, version=__version__)
+    main(arguments)
+    sys.exit(0)
