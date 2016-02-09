@@ -21,14 +21,14 @@ Author:
 """
 
 # VERSION
-__version__ = "0.5"
+__version__ = "0.6"
 
 
 # GLOBAL EXCUTION VARS
 num_pings = '2'
 testfile = "1mb.test"
 logfilename = 'modemtestreport.csv'
-csv_header = "Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(KBps),Download Speed(KBps),Modem ID,Group,MDN,Carrier,IMEI,RSSI,RSRP,RSRQ,SINR,Firmware"
+csv_header = "Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Download Speed(Bps),Modem ID,Group,MDN,Carrier,IMEI,RSSI,RSRP,RSRQ,SINR,Firmware"
 
 
 # IMPORTS
@@ -39,10 +39,6 @@ from docopt import docopt
 
 # MAIN DRIVER SECTION
 def main (arguments):
-
-    print("Arguments: ", arguments['<ftp_server_ip>'],
-                         arguments['<username>'],
-                         arguments['<password>'])
 
     # Ping test
     result = runPing(arguments)
@@ -99,7 +95,7 @@ def logPing(data):
                 try:
                     file.write(item + ',')
                 except IOError as e:
-                    print "Unable to write data to file."
+                    print "Unable to write ping data to file."
                     raise e
 
     except IOError as e:
@@ -145,17 +141,28 @@ def runFtpUpload(arguments):
     # Calculate upload rate
     delta = end_time - start_time # timedelta object
     elapsed = delta.total_seconds()
-    print "Elapsed: ", elapsed
     statinfo = os.stat(testfile)
     size = statinfo.st_size
-    print "Size: ", size
     upload_rate = size / elapsed
-    print "Upload rate (bytes/sec): ", upload_rate
-    print "Upload rate (bits/sec): ", upload_rate * 8
+    
+    return upload_rate
 
-# 
+# WRITE UPLOAD RESULTS TO FILE
 def logFtpUpload(data):
-    pass
+    print "Upload rate (bytes/sec): ", data
+    print "Upload rate (bits/sec): ", data * 8
+
+    try:
+        with open('modemtestreport.csv', 'a') as file:
+            try:
+                file.write(str(data) + ',')
+            except IOError as e:
+                print "Unable to write upload data to file."
+                raise e
+
+    except IOError as e:
+        print "Unable to open file."
+        raise e
 
 # DOWNLOAD TEST FILE FROM FTP SERVER
 def runFtpDownload(arguments):
@@ -184,17 +191,28 @@ def runFtpDownload(arguments):
     # Calculate download rate
     delta = end_time - start_time # timedelta object
     elapsed = delta.total_seconds()
-    print "Elapsed: ", elapsed
     statinfo = os.stat(testfile)
     size = statinfo.st_size
-    print "Size: ", size
     download_rate = size / elapsed
-    print "Download rate (bytes/sec): ", download_rate
-    print "Download rate (bits/sec): ", download_rate * 8
     
-# 
+    return download_rate
+    
+# WRITE DOWNLOAD RESULTS TO FILE
 def logFtpDownload(data):
-    pass
+    print "Download rate (bytes/sec): ", data
+    print "Download rate (bits/sec): ", data * 8
+
+    try:
+        with open('modemtestreport.csv', 'a') as file:
+            try:
+                file.write(str(data) + ',')
+            except IOError as e:
+                print "Unable to write upload data to file."
+                raise e
+
+    except IOError as e:
+        print "Unable to open file."
+        raise e
 
 # 
 def getModemStats(arguments):
