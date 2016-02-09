@@ -8,16 +8,13 @@ Description:
         - transport device stats
 
 Usage:
-    linkCheck.py <ftp_server_ip>
+    linkCheck.py <ftp_server_ip> <username> <password>
     linkCheck.py (-h | --help)
     linkCheck.py --version
 
 Options:
     -h --help       Show this screen
     -v --version    Show version
-    -i --server_ip  IP address of FTP server
-    -u --user       Username for FTP server
-    -p --password   Password for FTP user
 
 Author:
     Jeff Wright <jeff.wright@hughes.com>
@@ -42,6 +39,9 @@ from docopt import docopt
 
 # MAIN DRIVER SECTION
 def main (arguments):
+
+    print("Arguments: ", arguments['<ftp_server_ip>'],
+                          arguments['<username>'], arguments['<password>'])
 
     # Ping test
     result = runPing(arguments)
