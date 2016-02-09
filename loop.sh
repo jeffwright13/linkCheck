@@ -7,7 +7,7 @@ for i in `seq $num_loops`
 do
     printf 'Iteration %s\n' $i
     printf '============\n'
-    python linkCheck.py 66.82.228.131 npsrt H2ghes01;
+    python linkCheck.py 66.82.228.131 ***** *****;
     if [ "$i" -lt "$num_loops" ]; then
         sleep $sleep_time
     fi
