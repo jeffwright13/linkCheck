@@ -41,7 +41,8 @@ from docopt import docopt
 def main (arguments):
 
     print("Arguments: ", arguments['<ftp_server_ip>'],
-                          arguments['<username>'], arguments['<password>'])
+                         arguments['<username>'],
+                         arguments['<password>'])
 
     # Ping test
     result = runPing(arguments)
@@ -105,24 +106,98 @@ def logPing(data):
         print "Unable to open file."
         raise e
 
-# 
-def runFtpUpload(data):
-    pass
+# UPLOAD TEST FILE TO FTP SERVER
+def runFtpUpload(arguments):
+
+    #session = FTP(arguments['<ftp_server_ip>'])
+    #session.set_pasv(True)
+    #response = session.login(arguments['<username>'], arguments['<password>'])
+    #if not 'successful' in response:
+    #    print "FTP login not successful."
+    #    raise IOError
+    #file = open(testfile, 'wb')
+    #session.storbinary("STOR", testfile)
+    #session.quit()
+    
+    print "Uploading to FTP server..."
+
+    # Establish FTP session
+    session = FTP(arguments['<ftp_server_ip>'])
+    session.set_pasv(True)
+    response = session.login(arguments['<username>'], arguments['<password>'])
+    if not 'successful' in response:
+        print "FTP login not successful."
+        raise IOError
+
+    # Put file, then terminate FTP session
+    try:
+        fileh = open(testfile, "rb")
+    except IOError as e:
+        print "Cannot open local file for upload."
+        raise e
+        session.quit()
+    start_time = datetime.datetime.now()
+    session.storbinary('STOR ' + testfile, fileh)
+    end_time = datetime.datetime.now()
+    fileh.close()
+    session.quit()
+    
+    # Calculate upload rate
+    delta = end_time - start_time # timedelta object
+    elapsed = delta.total_seconds()
+    print "Elapsed: ", elapsed
+    statinfo = os.stat(testfile)
+    size = statinfo.st_size
+    print "Size: ", size
+    upload_rate = size / elapsed
+    print "Upload rate (bytes/sec): ", upload_rate
+    print "Upload rate (bits/sec): ", upload_rate * 8
 
 # 
 def logFtpUpload(data):
     pass
 
-# 
-def runFtpDownload(data):
-    pass
+# DOWNLOAD TEST FILE FROM FTP SERVER
+def runFtpDownload(arguments):
+    print "Downloading from FTP server..."
 
+    # Establish FTP session
+    session = FTP(arguments['<ftp_server_ip>'])
+    session.set_pasv(True)
+    response = session.login(arguments['<username>'], arguments['<password>'])
+    if not 'successful' in response:
+        print "FTP login not successful."
+        raise IOError
+
+    # Get file, then terminate FTP session
+    try:
+        fileh = open(testfile, 'wb')
+    except IOError as e:
+        print "Cannot open local file to write to."
+        session.quit()
+    start_time = datetime.datetime.now()
+    session.retrbinary('RETR ' + testfile, fileh.write)
+    end_time = datetime.datetime.now()
+    fileh.close()
+    session.quit()
+    
+    # Calculate download rate
+    delta = end_time - start_time # timedelta object
+    elapsed = delta.total_seconds()
+    print "Elapsed: ", elapsed
+    statinfo = os.stat(testfile)
+    size = statinfo.st_size
+    print "Size: ", size
+    download_rate = size / elapsed
+    print "Download rate (bytes/sec): ", download_rate
+    print "Download rate (bits/sec): ", download_rate * 8
+    
 # 
 def logFtpDownload(data):
     pass
 
 # 
-def getModemStats(data):
+def getModemStats(arguments):
     pass
 
 # 
