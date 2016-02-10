@@ -18,6 +18,10 @@ Arguments:
     ftp_server_ip   IPv4 address (in DDN) of FTP server
     ftp_username    Username for FTP server
     ftp_password    Password for FTP server
+    modem_type      Optional; valid types are "no_modem", "350", "750", "zyxel"
+    modem_ip        IPv4 address (in DDN) of modem  \  Required if modem
+    modem_username  Username for modem              |  type is specified
+    modem_password  Password for modem              /  as 350, 750 or zyxel
 
 Options:
     -h --help       Show this screen
@@ -33,7 +37,7 @@ __version__ = "linkCheck.py version 0.8"
 
 # GLOBAL EXCUTION VARS
 num_pings = '2'
-testfile = "1mb.test"
+testfile = "1kb.test"
 logfilename = 'modemtestreport.csv'
 csv_header = "Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Download Speed(Bps),Modem ID,Group,MDN,Carrier,IMEI,RSSI,RSRP,RSRQ,SINR,Firmware"
 
@@ -47,7 +51,7 @@ from docopt import docopt
 # MAIN DRIVER SECTION
 def main (arguments):
 
-    print "Arguments: ", arguments
+    #print "Arguments:\n", arguments
 
     # Ping test
     result = runPing(arguments)
@@ -62,19 +66,11 @@ def main (arguments):
     logFtpDownload(result)
 
     # Modem stats
-
     if arguments['no_modem']:
         return
-    elif arguments['350']:
-        result = getModemStats(arguments)
-    elif arguments['750']:
-        result = getModemStats(arguments)
-    elif arguments['zyxel']:
-        result = getModemStats(arguments)
     else:
-        print "Invalid modem_type. Terminating."
-        raise ValueError
-    logModemStats(result)
+        result = getModemStats(arguments)
+        logModemStats(result)
 
 
 # PING FTP SERVER
@@ -241,10 +237,12 @@ def logFtpDownload(data):
         raise e
 
 
-# LOG INTO MODE/TRANSPORT DEVICE AND RETRIEVE STATS
+# LOG INTO MODEM DEVICE AND RETRIEVE STATS
 def getModemStats(arguments):
 
-    # Login to the box
+    print "Arguments:\n", arguments
+
+    # Login to the modem
     try:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -255,21 +253,28 @@ def getModemStats(arguments):
         print "Cannot establish SSH connection to modem"
         raise e
     
-    # Issue "get" command and close out session
-    
-    stdin, stdout, stderr = ssh.exec_command('get')
-    modemStats = stdout.readlines()
-    print "Modem stats", modemStats
-    ssh.close()
-    
-    # Parse the modem stats result and extract params
-    matcher = re.compile("Active APN: (.*?)")
-    try:
-        g = matcher.search(modemStats).groups()
-        print "APN: ", g
-    except:
-        print "Cannot find APN from modem stats."
-        raise RuntimeError
+    # If Cradlepoint, SSH into it and retrieve stats using "get"
+    if arguments['350'] or arguments['750']:
+        # Issue "get" command and close out session
+        stdin, stdout, stderr = ssh.exec_command('get')
+        modemStats = stdout.readlines()
+        print "Modem stats", modemStats
+        ssh.close()
+        
+        # Parse the modem stats result and extract params
+        matcher = re.compile("Active APN: (.*?)")
+        try:
+            g = matcher.search(modemStats).groups()
+            print "APN: ", g
+        except:
+            print "Cannot find APN from modem stats."
+            raise RuntimeError
+    # If Zyxel, SSH into it and retrieve stats using ??? <<TO DO>>
+    elif arguments['zyxel']:
+        pass
+    # Should not reach this point - ??? <<ASSERT?>>
+    else:
+        pass
 
 # WRITE MODEM STATS INTO FILE
 def logModemStats(data):
