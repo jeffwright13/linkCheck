@@ -3,14 +3,25 @@
 """
 Description:
     Automate speedtests using FTP:
-        - ping FTP server (latency)
-        - upload & download speed
+        - ping times from FTP server
+        - upload & download speeds
         - transport device stats
 
 Usage:
-    linkCheck.py <ftp_server_ip> <username> <password>
-    linkCheck.py (-h | --help)
-    linkCheck.py --version
+    linkCheck.py  <ftp_server_ip> <ftp_username> <ftp_password> <modem_type>
+                  [<modem_ip> <modem_username> <modem_password>]
+    linkCheck.py  (-h | --help)
+    linkCheck.py  (-v | --version)
+
+Arguments:
+    ftp_server_ip   IPv4 address (in DDN) of FTP server
+    ftp_username    Username for FTP server
+    ftp_password    Password for FTP server
+    modem_type      Transport modem type; may be one of:
+                        "None"  (do not run modem stat operation)
+                        "350"   (Cradlepoint IBR350LPE)
+                        "750"   (Cradlepoint CBA750B)
+                        "Zyxel" (Zyxel P-660HN-51)
 
 Options:
     -h --help       Show this screen
@@ -21,7 +32,7 @@ Author:
 """
 
 # VERSION
-__version__ = "0.6"
+__version__ = "linkCheck.py version 0.7"
 
 
 # GLOBAL EXCUTION VARS
@@ -32,13 +43,27 @@ csv_header = "Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Downloa
 
 
 # IMPORTS
-import sys, os, socket, re, subprocess, datetime
+import sys, os, socket, re, subprocess, datetime, paramiko
 from ftplib import FTP
 from docopt import docopt
 
 
 # MAIN DRIVER SECTION
 def main (arguments):
+
+    # print "Arguments: ", arguments
+    
+    if arguments['<modem_type>'].lower() == "none":
+        pass
+    elif arguments['<modem_type>'] == "350":
+        pass
+    elif arguments['<modem_type>'] == "750":
+        pass
+    elif arguments['<modem_type>'].lower()== "zyxel":
+        pass
+    else:
+        print "Invalid modem_type", '"' + arguments['<modem_type>'] + '"', "specified. Terminating."
+        raise ValueError
 
     # Ping test
     result = runPing(arguments)
@@ -53,8 +78,9 @@ def main (arguments):
     logFtpDownload(result)
 
     # Modem stats
-    result = getModemStats(arguments)
-    logModemStats(result)
+
+    #result = getModemStats(arguments)
+    #logModemStats(result)
 
 
 # PING FTP SERVER
@@ -119,7 +145,7 @@ def runFtpUpload(arguments):
     # Establish FTP session
     session = FTP(arguments['<ftp_server_ip>'])
     session.set_pasv(True)
-    response = session.login(arguments['<username>'], arguments['<password>'])
+    response = session.login(arguments['<ftp_username>'], arguments['<ftp_password>'])
     if not 'successful' in response:
         print "FTP login not successful."
         raise IOError
@@ -174,7 +200,7 @@ def runFtpDownload(arguments):
     # Establish FTP session
     session = FTP(arguments['<ftp_server_ip>'])
     session.set_pasv(True)
-    response = session.login(arguments['<username>'], arguments['<password>'])
+    response = session.login(arguments['<ftp_username>'], arguments['<ftp_password>'])
     if not 'successful' in response:
         print "FTP login not successful."
         raise IOError
@@ -185,6 +211,7 @@ def runFtpDownload(arguments):
     except IOError as e:
         print "Cannot open local file to write to."
         session.quit()
+        raise e
     start_time = datetime.datetime.now()
     session.retrbinary('RETR ' + testfile, fileh.write)
     end_time = datetime.datetime.now()
@@ -222,8 +249,31 @@ def logFtpDownload(data):
 
 # LOG INTO MODE/TRANSPORT DEVICE AND RETRIEVE STATS
 def getModemStats(arguments):
-    pass
-
+    # Login to the box
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(arguments['<modem_ip>'], 22,
+                    arguments['<modem_username>'],
+                    arguments['<modem_password>'])
+    except IOError as e:
+        print "Cannot establish SSH connection to modem"
+        raise e
+    
+    # Issue "get" command and close out session
+    stdin, stdout, stderr = ssh.exec_command('get')
+    modemStats = stdout.readlines()
+    print "Modem stats", modemStats
+    ssh.close()
+    
+    # Parse the modem stats result and extract params
+    matcher = re.compile("Active APN: (.*?)")
+    try:
+        g = matcher.search(modemStats).groups()
+        print "APN: ", g
+    except:
+        print "Cannot find APN from modem stats."
+        raise RuntimeError
 
 # WRITE MODEM STATS INTO FILE
 def logModemStats(data):
