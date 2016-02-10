@@ -3,12 +3,13 @@
 """
 Description:
     Automate speedtests using FTP:
-        - ping times from FTP server
-        - upload & download speeds
-        - transport device stats
+        - get ping times from FTP server
+        - perform upload & download speed tests
+        - retrieve transport device stats
 
 Usage:
-    linkCheck.py  <ftp_server_ip> <ftp_username> <ftp_password> <modem_type>
+    linkCheck.py  <ftp_server_ip> <ftp_username> <ftp_password>
+                  (no_modem | 350 | 750 | zyxel)
                   [<modem_ip> <modem_username> <modem_password>]
     linkCheck.py  (-h | --help)
     linkCheck.py  (-v | --version)
@@ -17,11 +18,6 @@ Arguments:
     ftp_server_ip   IPv4 address (in DDN) of FTP server
     ftp_username    Username for FTP server
     ftp_password    Password for FTP server
-    modem_type      Transport modem type; may be one of:
-                        "None"  (do not run modem stat operation)
-                        "350"   (Cradlepoint IBR350LPE)
-                        "750"   (Cradlepoint CBA750B)
-                        "Zyxel" (Zyxel P-660HN-51)
 
 Options:
     -h --help       Show this screen
@@ -32,7 +28,7 @@ Author:
 """
 
 # VERSION
-__version__ = "linkCheck.py version 0.7"
+__version__ = "linkCheck.py version 0.8"
 
 
 # GLOBAL EXCUTION VARS
@@ -51,19 +47,7 @@ from docopt import docopt
 # MAIN DRIVER SECTION
 def main (arguments):
 
-    # print "Arguments: ", arguments
-    
-    if arguments['<modem_type>'].lower() == "none":
-        pass
-    elif arguments['<modem_type>'] == "350":
-        pass
-    elif arguments['<modem_type>'] == "750":
-        pass
-    elif arguments['<modem_type>'].lower()== "zyxel":
-        pass
-    else:
-        print "Invalid modem_type", '"' + arguments['<modem_type>'] + '"', "specified. Terminating."
-        raise ValueError
+    print "Arguments: ", arguments
 
     # Ping test
     result = runPing(arguments)
@@ -79,8 +63,18 @@ def main (arguments):
 
     # Modem stats
 
-    #result = getModemStats(arguments)
-    #logModemStats(result)
+    if arguments['no_modem']:
+        return
+    elif arguments['350']:
+        result = getModemStats(arguments)
+    elif arguments['750']:
+        result = getModemStats(arguments)
+    elif arguments['zyxel']:
+        result = getModemStats(arguments)
+    else:
+        print "Invalid modem_type. Terminating."
+        raise ValueError
+    logModemStats(result)
 
 
 # PING FTP SERVER
@@ -249,6 +243,7 @@ def logFtpDownload(data):
 
 # LOG INTO MODE/TRANSPORT DEVICE AND RETRIEVE STATS
 def getModemStats(arguments):
+
     # Login to the box
     try:
         ssh = paramiko.SSHClient()
@@ -261,6 +256,7 @@ def getModemStats(arguments):
         raise e
     
     # Issue "get" command and close out session
+    
     stdin, stdout, stderr = ssh.exec_command('get')
     modemStats = stdout.readlines()
     print "Modem stats", modemStats
