@@ -71,7 +71,14 @@ def runPing(arguments):
     except socket.error, e:
         print "Ping Error:", e
         raise e
-    return matcher.search(out).groups()
+    
+    try:
+        g = matcher.search(out).groups()
+    except:
+        print "No FTP connectivity? Bailing out."
+        raise RuntimeError
+
+    return g
 
 
 # WRITE PING RESULTS TO FILE
