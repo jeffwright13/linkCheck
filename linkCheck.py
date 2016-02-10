@@ -56,6 +56,7 @@ def main (arguments):
     result = getModemStats(arguments)
     logModemStats(result)
 
+
 # PING FTP SERVER
 def runPing(arguments):
 
@@ -102,19 +103,10 @@ def logPing(data):
         print "Unable to open file."
         raise e
 
+
 # UPLOAD TEST FILE TO FTP SERVER
 def runFtpUpload(arguments):
 
-    #session = FTP(arguments['<ftp_server_ip>'])
-    #session.set_pasv(True)
-    #response = session.login(arguments['<username>'], arguments['<password>'])
-    #if not 'successful' in response:
-    #    print "FTP login not successful."
-    #    raise IOError
-    #file = open(testfile, 'wb')
-    #session.storbinary("STOR", testfile)
-    #session.quit()
-    
     print "Uploading to FTP server..."
 
     # Establish FTP session
@@ -147,8 +139,10 @@ def runFtpUpload(arguments):
     
     return upload_rate
 
+
 # WRITE UPLOAD RESULTS TO FILE
 def logFtpUpload(data):
+
     print "Upload rate (bytes/sec): ", data
     print "Upload rate (bits/sec): ", data * 8
 
@@ -164,8 +158,10 @@ def logFtpUpload(data):
         print "Unable to open file."
         raise e
 
+
 # DOWNLOAD TEST FILE FROM FTP SERVER
 def runFtpDownload(arguments):
+
     print "Downloading from FTP server..."
 
     # Establish FTP session
@@ -197,8 +193,10 @@ def runFtpDownload(arguments):
     
     return download_rate
     
+
 # WRITE DOWNLOAD RESULTS TO FILE
 def logFtpDownload(data):
+
     print "Download rate (bytes/sec): ", data
     print "Download rate (bits/sec): ", data * 8
 
@@ -214,11 +212,13 @@ def logFtpDownload(data):
         print "Unable to open file."
         raise e
 
-# 
+
+# LOG INTO MODE/TRANSPORT DEVICE AND RETRIEVE STATS
 def getModemStats(arguments):
     pass
 
-# 
+
+# WRITE MODEM STATS INTO FILE
 def logModemStats(data):
     pass
 
