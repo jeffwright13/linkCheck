@@ -32,23 +32,66 @@ Author:
 """
 
 # VERSION
-__version__ = "linkCheck.py version 0.8"
+__version__ = "linkCheck.py version 0.9"
 
 
 # GLOBAL EXCUTION VARS
 num_pings = '2'
-testfile = "1kb.test"
+testfile = '1kb.test'
 logfilename = 'modemtestreport.csv'
-csv_header = "Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Download Speed(Bps),Modem ID,Group,MDN,Carrier,IMEI,RSSI,RSRP,RSRQ,SINR,Firmware"
+csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Download Speed(Bps),APN,Get Community String,Set Community String,Modem ID,Group,MDN,Carrier,IMEI,IMSI,RSSI,RSRP,RSRQ,SINR,Group,GPGGA,Service Type,Firmware1,Firmware2,RX Chann,TX Chann'
+modem_stats_dict = {'activeapn': '',
+                    'getcommunity': '', 
+                    'setcommunity': '',
+                    'modemid': '',
+                    'mdn': '',
+                    'carrid': '',
+                    'imei': '',
+                    'imsi': '',
+                    'rssi': '',
+                    'rsrp': '',
+                    'rsrq': '',
+                    'sinr': '',
+                    'group': '',
+                    'gpgga': '',
+                    'servicetype': '',
+                    'modemfw1': '',
+                    'modemfw2': '',
+                    'rxchannel': '',
+                    'txchannel': ''}  # Needs to match regex dict below
 
+# REGULAR EXPRESSIONS USED IN MATCHING
+ping_regex = "rtt min/avg/max/mdev = (\d+.\d+)/(\d+.\d+)/(\d+.\d+)/(\d+.\d+)"
 
+# "int1: Active APN: VZWINTERNET"
+
+modem_regex_dict = {'activeapn': 'Active APN:\s+\w+\"',
+                    'getcommunity': '', 
+                    'setcommunity': '',
+                    'modemid': '',
+                    'mdn': '',
+                    'carrid': '',
+                    'imei': '',
+                    'imsi': '',
+                    'rssi': '',
+                    'rsrp': '',
+                    'rsrq': '',
+                    'sinr': '',
+                    'group': '',
+                    'gpgga': '',
+                    'servicetype': '',
+                    'modemfw1': '',
+                    'modemfw2': '',
+                    'rxchannel': '',
+                    'txchannel': ''}
+          
 # IMPORTS
 import sys, os, socket, re, subprocess, datetime, paramiko
 from ftplib import FTP
 from docopt import docopt
 
 
-# MAIN DRIVER SECTION
+# MAIN EXECUTION SECTION
 def main (arguments):
 
     #print "Arguments:\n", arguments
@@ -69,8 +112,9 @@ def main (arguments):
     if arguments['no_modem']:
         return
     else:
-        result = getModemStats(arguments)
-        logModemStats(result)
+        getModemStats(arguments)
+        print "Modem Stats Dictionary:\n", modem_stats_dict
+        #logModemStats()
 
 
 # PING FTP SERVER
@@ -83,7 +127,7 @@ def runPing(arguments):
                                  stdout = subprocess.PIPE,
                                  stderr = subprocess.PIPE)
         out, error = ping.communicate()
-        matcher = re.compile("rtt min/avg/max/mdev = (\d+.\d+)/(\d+.\d+)/(\d+.\d+)/(\d+.\d+)")
+        matcher = re.compile(ping_regex)
     except socket.error, e:
         print "Ping Error:", e
         raise e
@@ -121,6 +165,7 @@ def logPing(data):
                 except IOError as e:
                     print "Unable to write ping data to file."
                     raise e
+        file.close()
 
     except IOError as e:
         print "Unable to open file."
@@ -176,6 +221,7 @@ def logFtpUpload(data):
             except IOError as e:
                 print "Unable to write upload data to file."
                 raise e
+        file.close()
 
     except IOError as e:
         print "Unable to open file."
@@ -220,17 +266,14 @@ def runFtpDownload(arguments):
 
 # WRITE DOWNLOAD RESULTS TO FILE
 def logFtpDownload(data):
-
-    print "Download rate (bytes/sec): ", data
-    print "Download rate (bits/sec): ", data * 8
-
     try:
         with open('modemtestreport.csv', 'a') as file:
             try:
                 file.write(str(data) + ',')
             except IOError as e:
-                print "Unable to write upload data to file."
+                print "Unable to write download data to file."
                 raise e
+        file.close()
 
     except IOError as e:
         print "Unable to open file."
@@ -240,8 +283,6 @@ def logFtpDownload(data):
 # LOG INTO MODEM DEVICE AND RETRIEVE STATS
 def getModemStats(arguments):
 
-    print "Arguments:\n", arguments
-
     # Login to the modem
     try:
         ssh = paramiko.SSHClient()
@@ -250,35 +291,58 @@ def getModemStats(arguments):
                     arguments['<modem_username>'],
                     arguments['<modem_password>'])
     except IOError as e:
-        print "Cannot establish SSH connection to modem"
+        print "Cannot establish SSH connection to modem."
         raise e
     
     # If Cradlepoint, SSH into it and retrieve stats using "get"
     if arguments['350'] or arguments['750']:
-        # Issue "get" command and close out session
+        # Issue 'get' command to modem and close SSH session
         stdin, stdout, stderr = ssh.exec_command('get')
-        modemStats = stdout.readlines()
-        print "Modem stats", modemStats
+        modemStats = stdout.readlines() # generates a list
         ssh.close()
-        
-        # Parse the modem stats result and extract params
-        matcher = re.compile("Active APN: (.*?)")
-        try:
-            g = matcher.search(modemStats).groups()
-            print "APN: ", g
-        except:
-            print "Cannot find APN from modem stats."
-            raise RuntimeError
+        modemStatsString = ''.join(modemStats) # convert list to string for regex
+
     # If Zyxel, SSH into it and retrieve stats using ??? <<TO DO>>
     elif arguments['zyxel']:
-        pass
-    # Should not reach this point - ??? <<ASSERT?>>
+        modemStatsString = ''.join('')
+
+    # Invalid modem type called internally
     else:
-        pass
+        print "Cannot SSH into invalid modem type. Terminating"
+        raise SystemError
+
+    # Parse the modem stats string and populate stats dictionary
+    for key in modem_stats_dict:
+        print "matching for expression:", modem_regex_dict[key]
+        matcher = re.compile(modem_regex_dict[key])
+        print "group:", matcher.search(modemStatsString).group()
+        print "groups:", matcher.search(modemStatsString).groups()
+        g = matcher.search(modemStatsString).group()
+
+        if type(g) == None:
+            print "Found nothing while processing", modem_regex_dict[key]
+        else:
+            print "Found match:", str(g), "while processing", key
+        modem_stats_dict[key] = str(g)
+
 
 # WRITE MODEM STATS INTO FILE
-def logModemStats(data):
-    pass
+def logModemStats():
+    try:
+        with open('modemtestreport.csv', 'a') as file:
+            for key in modem_stats_dict:
+                try:
+                    print "Writing:", modem_stats_dict[key] + ','
+                    file.write(modem_stats_dict[key] + ',')
+                except IOError as e:
+                    print "Unable to write modem stats to file."
+                    raise e
+        file.close()
+
+    except IOError as e:
+        print "Unable to open file."
+        raise e
+
 
 
 if __name__ == '__main__':
