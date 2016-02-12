@@ -6,6 +6,7 @@ Description:
         - get ping times from FTP server
         - perform upload & download speed tests
         - retrieve transport device stats
+          (currently supported: cradlepoint 350 & 750; zyxel)
 
 Usage:
     linkCheck.py  <ftp_server_ip> <ftp_username> <ftp_password>
@@ -32,58 +33,8 @@ Author:
 """
 
 # VERSION
-__version__ = "linkCheck.py version 0.9"
+__version__ = "linkCheck.py version 0.96"
 
-
-# GLOBAL EXCUTION VARS
-num_pings = '2'
-testfile = '1kb.test'
-logfilename = 'modemtestreport.csv'
-csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Download Speed(Bps),APN,Get Community String,Set Community String,Modem ID,Group,MDN,Carrier,IMEI,IMSI,RSSI,RSRP,RSRQ,SINR,Group,GPGGA,Service Type,Firmware1,Firmware2,RX Chann,TX Chann'
-modem_stats_dict = {'activeapn': '',
-                    'getcommunity': '', 
-                    'setcommunity': '',
-                    'modemid': '',
-                    'mdn': '',
-                    'carrid': '',
-                    'imei': '',
-                    'imsi': '',
-                    'rssi': '',
-                    'rsrp': '',
-                    'rsrq': '',
-                    'sinr': '',
-                    'group': '',
-                    'gpgga': '',
-                    'servicetype': '',
-                    'modemfw1': '',
-                    'modemfw2': '',
-                    'rxchannel': '',
-                    'txchannel': ''}  # Needs to match regex dict below
-
-# REGULAR EXPRESSIONS USED IN MATCHING
-ping_regex = "rtt min/avg/max/mdev = (\d+.\d+)/(\d+.\d+)/(\d+.\d+)/(\d+.\d+)"
-
-# "int1: Active APN: VZWINTERNET"
-
-modem_regex_dict = {'activeapn': 'Active APN:\s+\w+\"',
-                    'getcommunity': '', 
-                    'setcommunity': '',
-                    'modemid': '',
-                    'mdn': '',
-                    'carrid': '',
-                    'imei': '',
-                    'imsi': '',
-                    'rssi': '',
-                    'rsrp': '',
-                    'rsrq': '',
-                    'sinr': '',
-                    'group': '',
-                    'gpgga': '',
-                    'servicetype': '',
-                    'modemfw1': '',
-                    'modemfw2': '',
-                    'rxchannel': '',
-                    'txchannel': ''}
           
 # IMPORTS
 import sys, os, socket, re, subprocess, datetime, paramiko
@@ -91,10 +42,64 @@ from ftplib import FTP
 from docopt import docopt
 
 
+# GLOBAL EXCUTION VARS
+num_pings = '2'
+testfile = '4k.test'
+logfilename = 'modemtestreport.csv'
+#csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Download Speed(Bps),APN,Get Community String,Set Community String,Modem ID,Group,MDN,Carrier,IMEI,IMSI,RSSI,RSRP,RSRQ,SINR,Group,GPGGA,Service Type,Firmware1,Firmware2,RX Chann,TX Chann'
+csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Download Speed(Bps),Carrier'
+
+# NOTE: This dict needs to match regex dict below
+modem_stats_dict = {#'activeapn': '',
+                    #'getcommunity': '', 
+                    #'setcommunity': '',
+                    #'modemid': '',
+                    #'mdn': '',
+                    'carrid': '',
+                    #'imei': '',
+                    #'imsi': '',
+                    #'rssi': '',
+                    #'rsrp': '',
+                    #'rsrq': '',
+                    #'sinr': '',
+                    #'group': '',
+                    #'gpgga': '',
+                    #'servicetype': '',
+                    #'modemfw1': '',
+                    #'modemfw2': '',
+                    #'rxchannel': '',
+                    #'txchannel': ''}
+                    }
+
+# REGULAR EXPRESSIONS USED IN MATCHING
+ping_regex = "rtt min/avg/max/mdev = (\d+.\d+)/(\d+.\d+)/(\d+.\d+)/(\d+.\d+)"
+
+# "int1: Active APN: VZWINTERNET"
+#modem_regex_dict = {'carrid': r'(\"HOMECARRID\"):\s\"(.*)\"'}
+# NOTE: This dict needs to match stats dict above
+modem_regex_dict = {#'activeapn': r'Active APN:\s+\w+',
+                    #'getcommunity': r'', 
+                    #'setcommunity': r'',
+                    #'modemid': r'',
+                    #'mdn': r'',
+                    'carrid': r'(\"HOMECARRID\"):\s\"(.*)\"',
+                    #'imei': r'',
+                    #'imsi': r'',
+                    #'rssi': r'',
+                    #'rsrp': r'',
+                    #'rsrq': r'',
+                    #'sinr': r'',
+                    #'group': r'',
+                    #'gpgga': r'',
+                    #'servicetype': r'',
+                    #'modemfw1': r'',
+                    #'modemfw2': r'',
+                    #'rxchannel': r'',
+                    #'txchannel': r''}
+                    }
+
 # MAIN EXECUTION SECTION
 def main (arguments):
-
-    #print "Arguments:\n", arguments
 
     # Ping test
     result = runPing(arguments)
@@ -114,7 +119,7 @@ def main (arguments):
     else:
         getModemStats(arguments)
         print "Modem Stats Dictionary:\n", modem_stats_dict
-        #logModemStats()
+        logModemStats()
 
 
 # PING FTP SERVER
@@ -265,7 +270,12 @@ def runFtpDownload(arguments):
     
 
 # WRITE DOWNLOAD RESULTS TO FILE
+
 def logFtpDownload(data):
+
+    print "Download rate (bytes/sec): ", data
+    print "Download rate (bits/sec): ", data * 8
+
     try:
         with open('modemtestreport.csv', 'a') as file:
             try:
@@ -299,9 +309,9 @@ def getModemStats(arguments):
         # Issue 'get' command to modem and close SSH session
         stdin, stdout, stderr = ssh.exec_command('get')
         modemStats = stdout.readlines() # generates a list
-        ssh.close()
         modemStatsString = ''.join(modemStats) # convert list to string for regex
-
+        ssh.close()
+        
     # If Zyxel, SSH into it and retrieve stats using ??? <<TO DO>>
     elif arguments['zyxel']:
         modemStatsString = ''.join('')
@@ -311,19 +321,14 @@ def getModemStats(arguments):
         print "Cannot SSH into invalid modem type. Terminating"
         raise SystemError
 
-    # Parse the modem stats string and populate stats dictionary
+    # Parse the modem stats string and populate the stats dictionary
+    # This RE code splits string returned from modem on RE match, and then
+    # extracts element of interest from resulting list element 2 (third element)
     for key in modem_stats_dict:
-        print "matching for expression:", modem_regex_dict[key]
         matcher = re.compile(modem_regex_dict[key])
-        print "group:", matcher.search(modemStatsString).group()
-        print "groups:", matcher.search(modemStatsString).groups()
-        g = matcher.search(modemStatsString).group()
-
-        if type(g) == None:
-            print "Found nothing while processing", modem_regex_dict[key]
-        else:
-            print "Found match:", str(g), "while processing", key
-        modem_stats_dict[key] = str(g)
+        s = matcher.split(modemStatsString)
+        item = s[2]
+        modem_stats_dict[key] = item
 
 
 # WRITE MODEM STATS INTO FILE
@@ -342,7 +347,6 @@ def logModemStats():
     except IOError as e:
         print "Unable to open file."
         raise e
-
 
 
 if __name__ == '__main__':
