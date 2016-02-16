@@ -35,7 +35,7 @@ Author:
 """
 
 # VERSION
-__version__ = "linkCheck.py version 0.97"
+__version__ = "linkCheck.py version 0.99"
 
           
 # IMPORTS
@@ -46,10 +46,10 @@ from docopt import docopt
 
 # GLOBAL EXCUTION VARS
 num_pings = '5'
-testfile = '4k.test'
+testfile = '1mb.test'
 logfilename = 'modemtestreport.csv'
-csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Download Speed(Bps),Carrier,ServiceType,SignalStrength,RSRP,RSRQ,FW_Version'
-modem_stats_dict = {'CARRID':       '',
+csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(bps),Download Speed(bps),Hostname,Carrier,ServiceType,SignalStrength,RSRP,RSRQ,FW_Version'
+modem_stats_dict = {'HOMECARRID':   '',
                     'SERDIS':       '',
                     'SS':           '',
                     'RSRP':         '',
@@ -83,7 +83,8 @@ def main (arguments):
     if arguments['no_modem'] or arguments['zyxel']:
         return
     else:
-        getModemStats(arguments)
+        hostname = getModemStats(arguments)
+        logHostname(hostname)
         logModemStats()
 
 
@@ -177,15 +178,15 @@ def runFtpUpload(arguments):
     size = statinfo.st_size
     upload_rate = size / elapsed
     
-    return upload_rate
+    return upload_rate * 8
 
 
 # WRITE UPLOAD RESULTS TO FILE
 def logFtpUpload(data):
 
     if arguments['--debug']:
-        print "Upload rate (bytes/sec): ", data
-        print "Upload rate (bits/sec): ", data * 8
+        print "Upload rate (bytes/sec): ", data / 8
+        print "Upload rate (bits/sec): ", data
 
     try:
         with open('modemtestreport.csv', 'a') as file:
@@ -235,7 +236,7 @@ def runFtpDownload(arguments):
     size = statinfo.st_size
     download_rate = size / elapsed
     
-    return download_rate
+    return download_rate * 8
     
 
 # WRITE DOWNLOAD RESULTS TO FILE
@@ -243,8 +244,8 @@ def runFtpDownload(arguments):
 def logFtpDownload(data):
 
     if arguments['--debug']:
-        print "Download rate (bytes/sec): ", data
-        print "Download rate (bits/sec): ", data * 8
+        print "Download rate (bytes/sec): ", data / 8
+        print "Download rate (bits/sec): ", data
 
     try:
         with open('modemtestreport.csv', 'a') as file:
@@ -278,11 +279,9 @@ def getModemStats(arguments):
                         arguments['<modem_username>'],
                         arguments['<modem_password>'],
                         timeout = 1200)
-        except IOError as e:
-            print "Cannot establish SSH connection to modem."
-            raise e
-        
+       
             stdin, stdout, stderr = ssh.exec_command('get status/wan')
+
             
             # make it a list, then a string
             modemStats = stdout.readlines()
@@ -296,19 +295,39 @@ def getModemStats(arguments):
                 if parsed_json['devices'][device]['status']['connection_state'] == "connected":
                     wan_device = device
 
-            # Got the info we need so close SSH session
+            # Populate the modem stats dictionary
+            for key in modem_stats_dict:
+                modem_stats_dict[key] = parsed_json['devices'][wan_device]['diagnostics'][key]
+                
+            # Populate the hostname
+            hostname = parsed_json['devices'][wan_device]['config']['hostname']
+
             ssh.close()
+
+        except IOError as e:
+            print "Cannot establish SSH connection to modem."
+            raise e
 
     # Invalid modem type called internally
     else:
         print "Cannot SSH into modem type. Terminating."
         raise SystemError
 
+    return hostname
 
-    # Populate the modem stats dictionary
-    for key in modem_stats_dict:
-        modem_stats_dict[key] = parsed_json['devices'][wan_device]['diagnostics'][key]
+# WRITE MODEM STATS INTO FILE
+def logHostname(hostname):
 
+    if arguments['--debug']:
+        print "Writing hostname to CSV:", hostname
+
+    try:
+        with open('modemtestreport.csv', 'a') as file:
+            file.write(hostname + ',')
+
+    except IOError as e:
+        print "Unable to open file."
+        raise e
 
 # WRITE MODEM STATS INTO FILE
 def logModemStats():
@@ -318,7 +337,7 @@ def logModemStats():
 
     try:
         with open('modemtestreport.csv', 'a') as file:
-            file.write(modem_stats_dict['CARRID'] + ',')
+            file.write(modem_stats_dict['HOMECARRID'] + ',')
             file.write(modem_stats_dict['SERDIS'] + ',')
             file.write(modem_stats_dict['SS'] + ',')
             file.write(modem_stats_dict['RSRP'] + ',')
