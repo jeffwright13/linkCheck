@@ -177,8 +177,8 @@ def runFtpUpload(arguments):
     statinfo = os.stat(testfile)
     size = statinfo.st_size
     upload_rate = size / elapsed
-    
-    return upload_rate * 8
+
+    return int(upload_rate * 8)
 
 
 # WRITE UPLOAD RESULTS TO FILE
@@ -236,7 +236,7 @@ def runFtpDownload(arguments):
     size = statinfo.st_size
     download_rate = size / elapsed
     
-    return download_rate * 8
+    return int(download_rate * 8)
     
 
 # WRITE DOWNLOAD RESULTS TO FILE
