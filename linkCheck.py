@@ -35,7 +35,7 @@ Author:
 """
 
 # VERSION
-__version__ = "linkCheck.py version 0.99"
+__version__ = "linkCheck.py version 1.0.0"
 
           
 # IMPORTS
@@ -45,7 +45,7 @@ from docopt import docopt
 
 
 # GLOBAL EXCUTION VARS
-num_pings = '5'
+num_pings = '25'
 testfile = '1mb.test'
 logfilename = 'modemtestreport.csv'
 csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(bps),Download Speed(bps),Hostname,Carrier,ServiceType,SignalStrength,RSRP,RSRQ,FW_Version'
