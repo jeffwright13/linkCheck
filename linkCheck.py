@@ -12,6 +12,7 @@ Usage:
     linkCheck.py  <ftp_server_ip> <ftp_username> <ftp_password>
                   (no_modem | 350 | 750 | zyxel)
                   [<modem_ip> <modem_username> <modem_password>]
+                  [-d | --debug]
     linkCheck.py  (-h | --help)
     linkCheck.py  (-v | --version)
 
@@ -27,79 +28,44 @@ Arguments:
 Options:
     -h --help       Show this screen
     -v --version    Show version
+    -d --debug      Enable debug during execution (verbose mode)
 
 Author:
     Jeff Wright <jeff.wright@hughes.com>
 """
 
 # VERSION
-__version__ = "linkCheck.py version 0.96"
+__version__ = "linkCheck.py version 0.97"
 
           
 # IMPORTS
-import sys, os, socket, re, subprocess, datetime, paramiko
+import sys, os, socket, re, subprocess, datetime, paramiko, json
 from ftplib import FTP
 from docopt import docopt
 
 
 # GLOBAL EXCUTION VARS
-num_pings = '2'
+num_pings = '5'
 testfile = '4k.test'
 logfilename = 'modemtestreport.csv'
-#csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Download Speed(Bps),APN,Get Community String,Set Community String,Modem ID,Group,MDN,Carrier,IMEI,IMSI,RSSI,RSRP,RSRQ,SINR,Group,GPGGA,Service Type,Firmware1,Firmware2,RX Chann,TX Chann'
-csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Download Speed(Bps),Carrier'
+csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(Bps),Download Speed(Bps),Carrier,ServiceType,SignalStrength,RSRP,RSRQ,FW_Version'
+modem_stats_dict = {'CARRID':       '',
+                    'SERDIS':       '',
+                    'SS':           '',
+                    'RSRP':         '',
+                    'RSRQ':         '',
+                    'VER_PRETTY':   ''}
 
-# NOTE: This dict needs to match regex dict below
-modem_stats_dict = {#'activeapn': '',
-                    #'getcommunity': '', 
-                    #'setcommunity': '',
-                    #'modemid': '',
-                    #'mdn': '',
-                    'carrid': '',
-                    #'imei': '',
-                    #'imsi': '',
-                    #'rssi': '',
-                    #'rsrp': '',
-                    #'rsrq': '',
-                    #'sinr': '',
-                    #'group': '',
-                    #'gpgga': '',
-                    #'servicetype': '',
-                    #'modemfw1': '',
-                    #'modemfw2': '',
-                    #'rxchannel': '',
-                    #'txchannel': ''}
-                    }
 
 # REGULAR EXPRESSIONS USED IN MATCHING
 ping_regex = "rtt min/avg/max/mdev = (\d+.\d+)/(\d+.\d+)/(\d+.\d+)/(\d+.\d+)"
 
-# "int1: Active APN: VZWINTERNET"
-#modem_regex_dict = {'carrid': r'(\"HOMECARRID\"):\s\"(.*)\"'}
-# NOTE: This dict needs to match stats dict above
-modem_regex_dict = {#'activeapn': r'Active APN:\s+\w+',
-                    #'getcommunity': r'', 
-                    #'setcommunity': r'',
-                    #'modemid': r'',
-                    #'mdn': r'',
-                    'carrid': r'(\"HOMECARRID\"):\s\"(.*)\"',
-                    #'imei': r'',
-                    #'imsi': r'',
-                    #'rssi': r'',
-                    #'rsrp': r'',
-                    #'rsrq': r'',
-                    #'sinr': r'',
-                    #'group': r'',
-                    #'gpgga': r'',
-                    #'servicetype': r'',
-                    #'modemfw1': r'',
-                    #'modemfw2': r'',
-                    #'rxchannel': r'',
-                    #'txchannel': r''}
-                    }
 
 # MAIN EXECUTION SECTION
 def main (arguments):
+
+    if arguments['--debug']:
+        print "Command line arguments:", arguments
 
     # Ping test
     result = runPing(arguments)
@@ -114,18 +80,18 @@ def main (arguments):
     logFtpDownload(result)
 
     # Modem stats
-    if arguments['no_modem']:
+    if arguments['no_modem'] or arguments['zyxel']:
         return
     else:
         getModemStats(arguments)
-        print "Modem Stats Dictionary:\n", modem_stats_dict
         logModemStats()
 
 
 # PING FTP SERVER
 def runPing(arguments):
 
-    print "Pinging FTP server..."
+    if arguments['--debug']:
+        print "Pinging FTP server..."
     try:
         ping = subprocess.Popen(["ping", "-c", num_pings,
                                  arguments['<ftp_server_ip>']],
@@ -180,7 +146,8 @@ def logPing(data):
 # UPLOAD TEST FILE TO FTP SERVER
 def runFtpUpload(arguments):
 
-    print "Uploading to FTP server..."
+    if arguments['--debug']:
+        print "Uploading file", testfile, "to FTP server..."
 
     # Establish FTP session
     session = FTP(arguments['<ftp_server_ip>'])
@@ -216,8 +183,9 @@ def runFtpUpload(arguments):
 # WRITE UPLOAD RESULTS TO FILE
 def logFtpUpload(data):
 
-    print "Upload rate (bytes/sec): ", data
-    print "Upload rate (bits/sec): ", data * 8
+    if arguments['--debug']:
+        print "Upload rate (bytes/sec): ", data
+        print "Upload rate (bits/sec): ", data * 8
 
     try:
         with open('modemtestreport.csv', 'a') as file:
@@ -236,7 +204,8 @@ def logFtpUpload(data):
 # DOWNLOAD TEST FILE FROM FTP SERVER
 def runFtpDownload(arguments):
 
-    print "Downloading from FTP server..."
+    if arguments['--debug']:
+        print "Downloading from FTP server..."
 
     # Establish FTP session
     session = FTP(arguments['<ftp_server_ip>'])
@@ -273,8 +242,9 @@ def runFtpDownload(arguments):
 
 def logFtpDownload(data):
 
-    print "Download rate (bytes/sec): ", data
-    print "Download rate (bits/sec): ", data * 8
+    if arguments['--debug']:
+        print "Download rate (bytes/sec): ", data
+        print "Download rate (bits/sec): ", data * 8
 
     try:
         with open('modemtestreport.csv', 'a') as file:
@@ -290,65 +260,77 @@ def logFtpDownload(data):
         raise e
 
 
-# LOG INTO MODEM DEVICE AND RETRIEVE STATS
+# LOG INTO MODEM DEVICE AND RETRIEVE INFO
 def getModemStats(arguments):
 
-    # Login to the modem
-    try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(arguments['<modem_ip>'], 22,
-                    arguments['<modem_username>'],
-                    arguments['<modem_password>'])
-    except IOError as e:
-        print "Cannot establish SSH connection to modem."
-        raise e
-    
-    # If Cradlepoint, SSH into it and retrieve stats using "get"
+    if arguments['--debug']:
+        print "SSH'ing into modem and retrieving stats..."
+
+    # CRADLEPOINT:
+    # SSH in and navigate to /status/wan/devices, then enumerate wan interfaces
+    # We need to find which one is active in order to retrieve stats
     if arguments['350'] or arguments['750']:
-        # Issue 'get' command to modem and close SSH session
-        stdin, stdout, stderr = ssh.exec_command('get')
-        modemStats = stdout.readlines() # generates a list
-        modemStatsString = ''.join(modemStats) # convert list to string for regex
-        ssh.close()
+        try:
+            # paramiko.util.log_to_file("paramiko.log")
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(arguments['<modem_ip>'], 22,
+                        arguments['<modem_username>'],
+                        arguments['<modem_password>'],
+                        timeout = 1200)
+        except IOError as e:
+            print "Cannot establish SSH connection to modem."
+            raise e
         
-    # If Zyxel, SSH into it and retrieve stats using ??? <<TO DO>>
-    elif arguments['zyxel']:
-        modemStatsString = ''.join('')
+            stdin, stdout, stderr = ssh.exec_command('get status/wan')
+            
+            # make it a list, then a string
+            modemStats = stdout.readlines()
+            modemStatsString = str(''.join(modemStats)).lstrip()[1:]
+
+            # Parse the string into a nested dictionary using JSON module
+            parsed_json = json.loads(modemStatsString)
+
+            # Determine the WAN device that is currently connected
+            for device in parsed_json['devices']:
+                if parsed_json['devices'][device]['status']['connection_state'] == "connected":
+                    wan_device = device
+
+            # Got the info we need so close SSH session
+            ssh.close()
 
     # Invalid modem type called internally
     else:
-        print "Cannot SSH into invalid modem type. Terminating"
+        print "Cannot SSH into modem type. Terminating."
         raise SystemError
 
-    # Parse the modem stats string and populate the stats dictionary
-    # This RE code splits string returned from modem on RE match, and then
-    # extracts element of interest from resulting list element 2 (third element)
+
+    # Populate the modem stats dictionary
     for key in modem_stats_dict:
-        matcher = re.compile(modem_regex_dict[key])
-        s = matcher.split(modemStatsString)
-        item = s[2]
-        modem_stats_dict[key] = item
+        modem_stats_dict[key] = parsed_json['devices'][wan_device]['diagnostics'][key]
 
 
 # WRITE MODEM STATS INTO FILE
 def logModemStats():
+
+    if arguments['--debug']:
+        print "Modem stats dictionary to write to CSV:", modem_stats_dict
+
     try:
         with open('modemtestreport.csv', 'a') as file:
-            for key in modem_stats_dict:
-                try:
-                    print "Writing:", modem_stats_dict[key] + ','
-                    file.write(modem_stats_dict[key] + ',')
-                except IOError as e:
-                    print "Unable to write modem stats to file."
-                    raise e
-        file.close()
+            file.write(modem_stats_dict['CARRID'] + ',')
+            file.write(modem_stats_dict['SERDIS'] + ',')
+            file.write(modem_stats_dict['SS'] + ',')
+            file.write(modem_stats_dict['RSRP'] + ',')
+            file.write(modem_stats_dict['RSRQ'] + ',')
+            file.write(modem_stats_dict['VER_PRETTY'] + ',')
 
     except IOError as e:
         print "Unable to open file."
         raise e
 
 
+# Standard Python wrapper for module
 if __name__ == '__main__':
     arguments = docopt(__doc__, version=__version__)
     main(arguments)
