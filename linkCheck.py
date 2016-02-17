@@ -35,31 +35,38 @@ Author:
 """
 
 # VERSION
-__version__ = "linkCheck.py version 1.0.0"
+__version__ = "linkCheck.py version 1.0.1"
 
           
 # IMPORTS
-import sys, os, socket, re, subprocess, datetime, paramiko, json
+import sys, os, socket, re, subprocess, time, datetime, paramiko, json
 from ftplib import FTP
 from docopt import docopt
 
 
 # GLOBAL EXCUTION VARS
-num_pings = '25'
-testfile = '1mb.test'
+num_pings = '5'
+testfile = '4kb.test'
 logfilename = 'modemtestreport.csv'
-csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,Upload Speed(bps),Download Speed(bps),Hostname,Carrier,ServiceType,SignalStrength,RSRP,RSRQ,FW_Version'
-modem_stats_dict = {'HOMECARRID':   '',
-                    'SERDIS':       '',
-                    'SS':           '',
-                    'RSRP':         '',
-                    'RSRQ':         '',
-                    'VER_PRETTY':   ''}
+
+csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,FTP Up Speed (bps),FTP Down Speed (bps),Device Hostname,CP_Carrier,CP_ServiceType,CP_SignalStrength,CP_RSRP,CP_RSRQ,CP_FW_Version,Zy_Status,Zy_Upstream_Rate,Zy_Downstream_Rate'
+
+cp_modem_stats_dict =   {'HOMECARRID':  '',
+                        'SERDIS':       '',
+                        'SS':           '',
+                        'RSRP':         '',
+                        'RSRQ':         '',
+                        'VER_PRETTY':   ''}
+
+zy_modem_stats_dict =   {'STATUS':      '',
+                        'UPSTREAM':     '',
+                        'DOWNSTREAM':   '',
+                        'VERSION':      ''}
 
 
 # REGULAR EXPRESSIONS USED IN MATCHING
-ping_regex = "rtt min/avg/max/mdev = (\d+.\d+)/(\d+.\d+)/(\d+.\d+)/(\d+.\d+)"
-
+regex_ping = "rtt min/avg/max/mdev = (\d+.\d+)/(\d+.\d+)/(\d+.\d+)/(\d+.\d+)"
+regex_zyhost = ""
 
 # MAIN EXECUTION SECTION
 def main (arguments):
@@ -79,14 +86,20 @@ def main (arguments):
     result = runFtpDownload(arguments)
     logFtpDownload(result)
 
-    # Modem stats
-    if arguments['no_modem'] or arguments['zyxel']:
+    # Retrieve modem stats
+    if arguments['no_modem']:
         return
-    else:
-        hostname = getModemStats(arguments)
+    elif arguments['zyxel']:
+        hostname = getZyStats(arguments)
         logHostname(hostname)
-        logModemStats()
-
+        logZyModemStats()
+    elif arguments['350'] or arguments['750']:
+        hostname = getCpStats(arguments)
+        logHostname(hostname)
+        logCpModemStats()
+    else:
+        print "Invalid modem type. Terminating."
+        raise SystemError
 
 # PING FTP SERVER
 def runPing(arguments):
@@ -99,7 +112,7 @@ def runPing(arguments):
                                  stdout = subprocess.PIPE,
                                  stderr = subprocess.PIPE)
         out, error = ping.communicate()
-        matcher = re.compile(ping_regex)
+        matcher = re.compile(regex_ping)
     except socket.error, e:
         print "Ping Error:", e
         raise e
@@ -117,7 +130,7 @@ def runPing(arguments):
 def logPing(data):
 
     try:
-        with open('modemtestreport.csv', 'a') as file:
+        with open(logfilename, 'a') as file:
             # If file is size zero, write header into it
             if os.stat(logfilename).st_size == 0:
                 file.write(csv_header)
@@ -189,7 +202,7 @@ def logFtpUpload(data):
         print "Upload rate (bits/sec): ", data
 
     try:
-        with open('modemtestreport.csv', 'a') as file:
+        with open(logfilename, 'a') as file:
             try:
                 file.write(str(data) + ',')
             except IOError as e:
@@ -240,7 +253,6 @@ def runFtpDownload(arguments):
     
 
 # WRITE DOWNLOAD RESULTS TO FILE
-
 def logFtpDownload(data):
 
     if arguments['--debug']:
@@ -248,7 +260,7 @@ def logFtpDownload(data):
         print "Download rate (bits/sec): ", data
 
     try:
-        with open('modemtestreport.csv', 'a') as file:
+        with open(logfilename, 'a') as file:
             try:
                 file.write(str(data) + ',')
             except IOError as e:
@@ -261,89 +273,139 @@ def logFtpDownload(data):
         raise e
 
 
-# LOG INTO MODEM DEVICE AND RETRIEVE INFO
-def getModemStats(arguments):
-
-    if arguments['--debug']:
-        print "SSH'ing into modem and retrieving stats..."
+# LOG INTO CRADLEPOINT AND RETRIEVE INFO
+def getCpStats(arguments):
 
     # CRADLEPOINT:
     # SSH in and navigate to /status/wan/devices, then enumerate wan interfaces
     # We need to find which one is active in order to retrieve stats
-    if arguments['350'] or arguments['750']:
-        try:
-            # paramiko.util.log_to_file("paramiko.log")
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(arguments['<modem_ip>'], 22,
-                        arguments['<modem_username>'],
-                        arguments['<modem_password>'],
-                        timeout = 1200)
-       
-            stdin, stdout, stderr = ssh.exec_command('get status/wan')
+    if arguments['--debug']:
+        print "SSH'ing into Cradlepoint and retrieving stats..."
 
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(arguments['<modem_ip>'], 22,
+                    arguments['<modem_username>'],
+                    arguments['<modem_password>'],
+                    timeout = 1200)
+   
+        stdin, stdout, stderr = ssh.exec_command('get status/wan')
+        
+        # make it a list, then a string
+        modemStats = stdout.readlines()
+        modemStatsString = str(''.join(modemStats)).lstrip()[1:]
+
+        # Parse the string into a nested dictionary using JSON module
+        parsed_json = json.loads(modemStatsString)
+
+        # Determine the WAN device that is currently connected
+        for device in parsed_json['devices']:
+            if parsed_json['devices'][device]['status']['connection_state'] == "connected":
+                wan_device = device
+
+        # Populate the modem stats dictionary
+        for key in cp_modem_stats_dict:
+            cp_modem_stats_dict[key] = parsed_json['devices'][wan_device]['diagnostics'][key]
             
-            # make it a list, then a string
-            modemStats = stdout.readlines()
-            modemStatsString = str(''.join(modemStats)).lstrip()[1:]
+        # Populate the hostname
+        hostname = parsed_json['devices'][wan_device]['config']['hostname']
 
-            # Parse the string into a nested dictionary using JSON module
-            parsed_json = json.loads(modemStatsString)
+        ssh.close()
 
-            # Determine the WAN device that is currently connected
-            for device in parsed_json['devices']:
-                if parsed_json['devices'][device]['status']['connection_state'] == "connected":
-                    wan_device = device
-
-            # Populate the modem stats dictionary
-            for key in modem_stats_dict:
-                modem_stats_dict[key] = parsed_json['devices'][wan_device]['diagnostics'][key]
-                
-            # Populate the hostname
-            hostname = parsed_json['devices'][wan_device]['config']['hostname']
-
-            ssh.close()
-
-        except IOError as e:
-            print "Cannot establish SSH connection to modem."
-            raise e
-
-    # Invalid modem type called internally
-    else:
-        print "Cannot SSH into modem type. Terminating."
-        raise SystemError
+    except IOError as e:
+        print "Cannot establish SSH connection to modem."
+        raise e
 
     return hostname
 
-# WRITE MODEM STATS INTO FILE
+
+# LOG INTO ZYXEL AND RETRIEVE INFO
+def getZyStats(arguments):
+
+    # ZYXEL:
+    # SSH in and retrieve hostname and SW version, then line stats info
+    if arguments['--debug']:
+        print "SSH'ing into Zyxel and retrieving stats..."
+
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(arguments['<modem_ip>'], 22,
+                    arguments['<modem_username>'],
+                    arguments['<modem_password>'],
+                    timeout = 20)
+        try:
+            stdin, stdout, stderr = ssh.exec_command('?')
+        except Exception as e:
+            print "SSH Exception executing command."
+            raise e
+        
+        time.sleep(5)
+        ssh.close()
+
+        # make it a list, then a string
+        modemStats = stdout.readlines()
+        print "modemStats:::", modemStats
+        modemStatsString = str(modemStats[0]).strip(' > ')
+        print "modemStatsString:", modemStatsString
+
+    except IOError as e:
+        print "Cannot establish SSH connection to modem."
+        raise e
+
+    return modemStatsString
+
+
+# WRITE HOSTNAME INTO FILE
 def logHostname(hostname):
 
     if arguments['--debug']:
         print "Writing hostname to CSV:", hostname
 
     try:
-        with open('modemtestreport.csv', 'a') as file:
+        with open(logfilename, 'a') as file:
             file.write(hostname + ',')
 
     except IOError as e:
         print "Unable to open file."
         raise e
 
-# WRITE MODEM STATS INTO FILE
-def logModemStats():
+# WRITE CRADLEPOINT MODEM STATS INTO FILE
+def logCpModemStats():
 
     if arguments['--debug']:
-        print "Modem stats dictionary to write to CSV:", modem_stats_dict
+        print "Cradlepoint stats dictionary to write to CSV:", cp_modem_stats_dict
 
     try:
-        with open('modemtestreport.csv', 'a') as file:
-            file.write(modem_stats_dict['HOMECARRID'] + ',')
-            file.write(modem_stats_dict['SERDIS'] + ',')
-            file.write(modem_stats_dict['SS'] + ',')
-            file.write(modem_stats_dict['RSRP'] + ',')
-            file.write(modem_stats_dict['RSRQ'] + ',')
-            file.write(modem_stats_dict['VER_PRETTY'] + ',')
+        with open(logfilename, 'a') as file:
+            file.write(cp_modem_stats_dict['HOMECARRID'] + ',')
+            file.write(cp_modem_stats_dict['SERDIS'] + ',')
+            file.write(cp_modem_stats_dict['SS'] + ',')
+            file.write(cp_modem_stats_dict['RSRP'] + ',')
+            file.write(cp_modem_stats_dict['RSRQ'] + ',')
+            file.write(cp_modem_stats_dict['VER_PRETTY'] + ',')
 
+    except IOError as e:
+        print "Unable to open file."
+        raise e
+
+
+# WRITE ZYXEL MODEM STATS INTO FILE
+def logZyModemStats():
+
+    if arguments['--debug']:
+        print "Zyxel stats dictionary to write to CSV:", zy_modem_stats_dict
+
+    try:
+        with open(logfilename, 'a') as file:
+            # Write blanks in Cradlepoint stat columns
+            for k in range(len(cp_modem_stats_dict)):
+                file.write(',')
+            file.write(zy_modem_stats_dict['STATUS'] + ',')
+            file.write(zy_modem_stats_dict['UPSTREAM'] + ',')
+            file.write(zy_modem_stats_dict['DOWNSTREAM'] + ',')
+            file.write(zy_modem_stats_dict['VERSION'] + ',')
     except IOError as e:
         print "Unable to open file."
         raise e
