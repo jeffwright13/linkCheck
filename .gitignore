@@ -65,4 +65,5 @@ target/
 *.csv
 *.test
 *.bak
+*.txt
 loop.sh
