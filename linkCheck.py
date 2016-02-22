@@ -45,7 +45,7 @@ from docopt import docopt
 
 
 # GLOBAL EXCUTION VARS
-num_pings = '5'
+num_pings = '2'
 testfile = '4kb.test'
 logfilename = 'modemtestreport.csv'
 
@@ -346,9 +346,7 @@ def getZyStats(arguments):
 
         # make it a list, then a string
         modemStats = stdout.readlines()
-        print "modemStats:::", modemStats
         modemStatsString = str(modemStats[0]).strip(' > ')
-        print "modemStatsString:", modemStatsString
 
     except IOError as e:
         print "Cannot establish SSH connection to modem."
