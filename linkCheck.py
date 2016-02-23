@@ -45,8 +45,8 @@ from docopt import docopt
 
 
 # GLOBAL EXCUTION VARS
-num_pings = '2'
-testfile = '4kb.test'
+num_pings = '25'
+testfile = '1mb.test'
 logfilename = 'modemtestreport.csv'
 
 csv_header = 'Date-Time,Ping Min,Ping Avg,Ping Max,Ping Dev,FTP Up Speed (bps),FTP Down Speed (bps),Device Hostname,CP_Carrier,CP_ServiceType,CP_SignalStrength,CP_RSRP,CP_RSRQ,CP_FW_Version,Zy_Status,Zy_Upstream_Rate,Zy_Downstream_Rate'
@@ -72,7 +72,7 @@ regex_zyhost = ""
 def main (arguments):
 
     if arguments['--debug']:
-        print "Command line arguments:", arguments
+        print "Command line arguments:\n", arguments
 
     # Ping test
     result = runPing(arguments)
