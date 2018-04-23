@@ -167,7 +167,7 @@ def runFtpUpload(arguments):
     session = FTP(arguments['<ftp_server_ip>'])
     session.set_pasv(True)
     response = session.login(arguments['<ftp_username>'], arguments['<ftp_password>'])
-    if not 'successful' in response:
+    if not '230' in response:
         print "FTP login not successful."
         raise IOError
 
@@ -225,7 +225,7 @@ def runFtpDownload(arguments):
     session = FTP(arguments['<ftp_server_ip>'])
     session.set_pasv(True)
     response = session.login(arguments['<ftp_username>'], arguments['<ftp_password>'])
-    if not 'successful' in response:
+    if not '230' in response:
         print "FTP login not successful."
         raise IOError
 
